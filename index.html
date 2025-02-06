@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Mesmerizing Boids Updated</title>
+        <style>
+            body {
+                margin: 0;
+                overflow: hidden;
+                background: black;
+            }
+            #recreate {
+                position: absolute;
+                bottom: 10px;
+                left: 10px;
+                padding: 10px 20px;
+                background: black;
+                border: 2px solid white;
+                cursor: pointer;
+                font-size: 16px;
+                color: white;
+                text-shadow: 0 0 5px white;
+                box-shadow: 0 0 10px white;
+                transition: all 0.3s ease-in-out;
+            }
+            #recreate:hover {
+                box-shadow: 0 0 20px white;
+            }
+             /* Info Button */
+        #infoButton {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            font-size: 20px;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            color: white;
+            transition: 0.3s;
+            z-index: 10;
+        }
+
+        #infoButton:hover {
+            background: rgba(255, 255, 255, 0.4);
+        }
+
+        /* Floating Info Window */
+        #infoWindow {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            max-width: 320px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            border-radius: 10px;
+            box-shadow: 0px 0px 10px rgba(255, 255, 255, 0.2);
+            display: none;
+            text-align: center;
+            z-index: 10;
+        }
+
+        #closeInfo {
+            margin-top: 10px;
+            padding: 8px 12px;
+            background: red;
+            border: none;
+            color: white;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        </style>
+    </head>
+    <body>
+        <canvas id='world'></canvas>
+        <button id="recreate">Recreate</button>
+          <!-- Info Button -->
+    <button id="infoButton">&#9432;</button>
+
+    <!-- Floating Info Window -->
+    <div id="infoWindow">
+        <h3>Mesmerizing Boids Updated</h3>
+        <p>This animation represents a mesmerizing boid simulation. The algorithm follows simple flocking behavior with randomness to create unique patterns. Each boid follows a trajectory, changes direction based on probability, and leaves a glowing trail. Click "Recreate" to generate a new pattern. This update added a soft, glowing watercolor effect behind the main strokes.</p>
+        <button id="closeInfo">Close</button>
+    </div>
+        <script>
+            var Boid = function (x, y, angle, gen) {
+                this.x = x;
+                this.y = y;
+                this.angle = Math.pow(Math.random(), 10) + angle;
+                this.dx = Math.cos(this.angle);
+                this.dy = Math.sin(this.angle);
+                this.life = Math.random() * 30 + 10;
+                this.gen = gen;
+                this.dead = false;
+                this.dist = dist(this.x, this.y, width / 2, height / 2);
+                this.hue = Math.random() * 360;
+                this.update = function () {
+                    roads_context.strokeStyle = 'white';
+                    roads_context.beginPath();
+                    roads_context.moveTo(this.x, this.y);
+                    this.x += this.dx * 2;
+                    this.y += this.dy * 2;
+                    this.dist = dist(this.x, this.y, width / 2, height / 2);
+                    roads_context.lineTo(this.x, this.y);
+                    roads_context.stroke();
+                    var trail = Math.random() * ((50 - 10) * ((this.dist / width) * 2)) + 10;
+                    var color = { h: this.hue, s: "100%", l: "50%" };
+                    watercolor_context.strokeStyle = `hsla(${color.h},${color.s},${color.l},0.1)`;
+                    watercolor_context.lineWidth = 2;
+                    for (var i = 0; i < 5; i++) {
+                        watercolor_context.beginPath();
+                        watercolor_context.moveTo(this.x, this.y);
+                        var px = this.x + Math.cos(this.angle + 90) * (i * (trail / 10));
+                        var py = this.y + Math.sin(this.angle + 90) * (i * (trail / 10));
+                        watercolor_context.lineTo(px, py);
+                        watercolor_context.stroke();
+                    }
+                    var index = (Math.floor(this.x) + width * Math.floor(this.y)) * 4;
+                    if (this.gen >= this.life) this.kill();
+                    if (data[index + 3] > 0) {
+                        this.kill();
+                        blocks++;
+                    }
+                    if (this.x < 0 || this.x > width) this.kill();
+                    if (this.y < 0 || this.y > height) this.kill();
+                }
+                this.kill = function () {
+                    boids.splice(boids.indexOf(this), 1);
+                    this.dead = true;
+                }
+            }
+            var dist = function (x1, y1, x2, y2) {
+                return Math.sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2));
+            }
+            var width = window.innerWidth;
+            var height = window.innerHeight;
+            var canvas = document.getElementById('world');
+            canvas.width = width;
+            canvas.height = height;
+            roads_canvas = document.createElement('canvas');
+            roads_canvas.width = width;
+            roads_canvas.height = height;
+            roads_context = roads_canvas.getContext('2d');
+            watercolor_canvas = document.createElement('canvas');
+            watercolor_canvas.width = width;
+            watercolor_canvas.height = height;
+            watercolor_context = watercolor_canvas.getContext('2d');
+            var context = canvas.getContext('2d');
+            var image, data;
+            var boids = [];
+            var blocks = 0;
+            function startSimulation() {
+                boids = [];
+                roads_context.clearRect(0, 0, width, height);
+                watercolor_context.clearRect(0, 0, width, height);
+                boids.push(new Boid(width / 2, height / 2, Math.random() * 180 * Math.PI / 180, 0));
+                clearInterval(drawing);
+                drawing = setInterval(animate, 1000 / 60);
+            }
+            function animate() {
+                image = roads_context.getImageData(0, 0, width, height);
+                data = image.data;
+                for (var i = 0; i < boids.length; i++) {
+                    var boid = boids[i];
+                    boid.update();
+                    var n = ((0.9 - 0.6) * ((boid.dist / width) * 2)) + 0.6;
+                    if (!boid.dead && Math.random() > n && boids.length < 400) {
+                        boids.push(new Boid(boid.x, boid.y, (Math.random() > 0.5 ? 90 : -90) * Math.PI / 180 + boid.angle, boid.gen + 1));
+                    }
+                }
+                context.clearRect(0, 0, width, height);
+                context.globalAlpha = 0.5;
+                context.drawImage(watercolor_canvas, 0, 0);
+                context.globalAlpha = 1;
+                context.drawImage(roads_canvas, 0, 0);
+                if (boids.length == 0) {
+                    clearInterval(drawing);
+                }
+            }
+            var drawing = setInterval(animate, 1000 / 60);
+            document.getElementById('recreate').addEventListener('click', startSimulation);
+            startSimulation();
+            
+            // Info Button Functionality
+        const infoButton = document.getElementById("infoButton");
+        const infoWindow = document.getElementById("infoWindow");
+        const closeInfo = document.getElementById("closeInfo");
+
+        infoButton.addEventListener("click", () => {
+            infoWindow.style.display = "block";
+        });
+
+        closeInfo.addEventListener("click", () => {
+            infoWindow.style.display = "none";
+        });
+        </script>
+    </body>
+  </html>
+  
